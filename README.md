@@ -1,109 +1,109 @@
 # Antigravity Multi-Agent Orchestration Kit
 
-Готовый шаблон и руководство по настройке **трёхуровневой оркестрации (Hub-and-Spoke)** для **Google Antigravity** (локально на Windows/macOS и на удалённом Linux-сервере по SSH).
+A ready-to-use template and guide for setting up **three-tier Hub-and-Spoke orchestration** for **Google Antigravity** (locally on Windows/macOS and on remote Linux servers over SSH).
 
 ---
 
-## 1. Архитектура (3 уровня)
+## 1. Architecture (3 Tiers)
 
 ```text
-Уровень 1 · Глобальный плагин (always_on во всех проектах)
+Tier 1 · Global Plugin (always_on across all projects)
 ~/.gemini/config/plugins/security-baseline/
 ├── plugin.json
-└── rules/AGENTS.md          # Секреты, Docker, SQL, сеть, автообновление STATE.md
+└── rules/AGENTS.md          # Secrets, Docker, SQL, networking, auto-updating STATE.md
 
-        │ (автонаследование)
+        │ (auto-inherited)
         ▼
 
-Уровень 2 · Центр управления (_control-plane / Hub)
+Tier 2 · Control Plane (_control-plane / Hub)
 projects/_control-plane/
-├── GEMINI.md                # Роль оркестратора (не писать прикладной код, работать через manifests/)
-├── PORTFOLIO.md             # Карта всех проектов, стеков, рисков и моделей
-├── manifests/               # HardLink (Windows) / Symlink (Linux) на GEMINI.md и STATE.md проектов
-├── generated-prompts/       # Самодостаточные ТЗ/промпты для изолированных чатов
+├── GEMINI.md                # Orchestrator role (no app code, works via manifests/)
+├── PORTFOLIO.md             # Map of all projects, stacks, risks, and models
+├── manifests/               # HardLinks (Windows) / Symlinks (Linux) to project GEMINI.md & STATE.md
+├── generated-prompts/       # Self-contained prompts/specs for isolated worker chats
 └── .agents/skills/
-    ├── security-sync/SKILL.md   # Команда /security-sync — аудит портфеля
-    └── init-project/SKILL.md    # Команда /init-project — подключение нового проекта
+    ├── security-sync/SKILL.md   # /security-sync — portfolio-wide security audit
+    └── init-project/SKILL.md    # /init-project — onboard a new project
 
-        │ (промпты и ссылки)
+        │ (prompts & links)
         ▼
 
-Уровень 3 · Изолированные проекты (Spokes)
+Tier 3 · Isolated Projects (Spokes)
 projects/<project-name>/
-├── GEMINI.md                # Компактный паспорт проекта (подгружается автоматически, до 1–3 КБ)
-└── STATE.md                 # Текущий статус и открытые риски (читается по требованию)
+├── GEMINI.md                # Compact project passport (auto-loaded, 1–3 KB)
+└── STATE.md                 # Current status and open risks (read on demand)
 ```
 
-### Зачем так устроено
-1. **Чистый контекст и экономия токенов:** чат внутри `Films` видит только `security-baseline` и `Films/GEMINI.md`, не засоряя контекст кодом других проектов.
-2. **Оркестратор без сканирования всего кода:** `_control-plane` читает только `PORTFOLIO.md` и `manifests/*`, быстро находит системные риски (например, `:latest` в Docker или отсутствие `USER`) и выдаёт готовые промпты.
-3. **Актуальное состояние:** глобальное правило в `AGENTS.md` обязывает агента автоматически обновлять `STATE.md` после значимых изменений — и через ссылки в `manifests/` оркестратор сразу это видит.
+### Why This Structure Works
+1. **Clean Context & Token Savings:** A chat inside `Films` only sees `security-baseline` and `Films/GEMINI.md`, without polluting its context with code from other projects.
+2. **Orchestrator Without Full-Codebase Scans:** `_control-plane` reads only `PORTFOLIO.md` and `manifests/*`, quickly spots systemic risks (e.g., `:latest` Docker tags or missing non-root `USER`), and generates focused prompts.
+3. **Always Up-to-Date State:** The global rule in `AGENTS.md` instructs agents to automatically update `STATE.md` after significant changes — and `_control-plane` sees updates immediately via `manifests/`.
 
 ---
 
-## 2. Быстрый старт (применение на новой машине или сервере)
+## 2. Quick Start (New Machine or Server)
 
 ### Windows (PowerShell)
 ```powershell
-git clone <URL_этого_репозитория> antigravity-orchestration
+git clone <this-repo-url> antigravity-orchestration
 cd antigravity-orchestration
 .\scripts\install.ps1
 ```
 
-### Linux / macOS / Удалённый сервер
+### Linux / macOS / Remote Server
 ```bash
-git clone <URL_этого_репозитория> antigravity-orchestration
+git clone <this-repo-url> antigravity-orchestration
 cd antigravity-orchestration
 chmod +x scripts/install.sh
 ./scripts/install.sh
 ```
 
-Скрипт:
-1. Устанавливает глобальный плагин `security-baseline` в `~/.gemini/config/plugins/security-baseline/`.
-2. Настраивает глобальный `.gitignore` (`core.excludesfile`), чтобы `GEMINI.md` и `STATE.md` **не попадали в коммиты** чужих или публичных репозиториев (опционально отключается флагом).
-3. Создаёт `~/projects/_control-plane` из шаблона (если его ещё нет).
+What the installer does:
+1. Installs the global `security-baseline` plugin into `~/.gemini/config/plugins/security-baseline/`.
+2. Configures a global `.gitignore` (`core.excludesfile`) so `GEMINI.md` and `STATE.md` are **never accidentally committed** to public or project repositories (can be skipped on Windows with `-SkipGlobalGitIgnore`).
+3. Initializes `~/projects/_control-plane` from the template if it does not exist yet.
 
 ---
 
-## 3. Как использовать в работе
+## 3. Daily Workflow
 
-### А. Добавить существующий или новый проект
-1. Создай/открой проект и привяжи его в левой панели Antigravity (**Projects**).
-2. Открой чат в `_control-plane` и вызови:
+### A. Onboard a New or Existing Project
+1. Create or open the project folder and add it in the Antigravity **Projects** sidebar.
+2. Open a chat in `_control-plane` and run:
    ```text
-   /init-project <имя-проекта> <путь-к-папке>
+   /init-project <project-name> <path-to-folder>
    ```
-   Либо скопируй `templates/project/GEMINI.md` и `STATE.md` в корень проекта, адаптируй под стек и создай ссылки в `_control-plane/manifests/`:
+   Or manually copy `templates/project/GEMINI.md` and `STATE.md` into the project root, adapt them to the stack, and link them into `_control-plane/manifests/`:
    - **Linux/macOS:**
      ```bash
      ln -sf ~/projects/<proj>/GEMINI.md ~/projects/_control-plane/manifests/<proj>-GEMINI.md
      ln -sf ~/projects/<proj>/STATE.md  ~/projects/_control-plane/manifests/<proj>-STATE.md
      ```
-   - **Windows (без прав администратора — HardLink на одном диске):**
+   - **Windows (no admin rights required — HardLink on the same drive):**
      ```powershell
      New-Item -ItemType HardLink -Path "$HOME\projects\_control-plane\manifests\<proj>-GEMINI.md" -Target "$HOME\projects\<proj>\GEMINI.md"
      New-Item -ItemType HardLink -Path "$HOME\projects\_control-plane\manifests\<proj>-STATE.md"  -Target "$HOME\projects\<proj>\STATE.md"
      ```
 
-### Б. Выбор моделей под задачу
-| Задача | Рекомендуемая модель | Почему |
+### B. Choosing the Right Model
+| Task | Recommended Model | Why |
 | :--- | :--- | :--- |
-| Оркестрация в `_control-plane`, `/security-sync`, сложный аудит | Сильная рассуждающая (**Opus / Pro / Orchestrator**) | Контекст маленький (`PORTFOLIO.md` + `manifests/`), важна глубина анализа |
-| Фикс бага или фича в одном проекте | Сбалансированная кодерская (**Sonnet / Argon**) | Оптимальный баланс качества кода и расхода квот |
-| Мелкие правки UI, доки, выполнение готового чёткого промпта | Быстрая (**Flash / Hydrogen**) | Максимальная скорость и экономия квот |
-| Сложный/неясный баг в одном проекте | **Orchestrator** или `/plan` | Сначала планирование сильной моделью, затем исполнение |
+| `_control-plane` orchestration, `/security-sync`, deep audits | Strong reasoning (**Opus / Pro / Orchestrator**) | Small context (`PORTFOLIO.md` + `manifests/`), high-leverage planning |
+| Bug fix or feature inside a single project | Balanced coding (**Sonnet / Argon**) | Best balance of code quality, speed, and quota usage |
+| Minor UI tweaks, docs, executing a clear generated prompt | Fast (**Flash / Hydrogen**) | Maximum speed and minimal quota cost |
+| Complex or unclear multi-file bug | **Orchestrator** or `/plan` | Strong model plans first, lighter steps execute efficiently |
 
-### В. Аудит всего портфеля
-Открой чат в `_control-plane` и напиши:
+### C. Portfolio-Wide Security Audit
+Open a chat in `_control-plane` and run:
 ```text
 /security-sync
 ```
-Оркестратор сверит `PORTFOLIO.md` и `manifests/*` с `security-baseline` и создаст готовые промпты в `generated-prompts/<project>-security.md`. Затем открывай каждый проект в отдельном чате и передавай ему соответствующий промпт.
+The orchestrator compares `PORTFOLIO.md` and `manifests/*` against `security-baseline` and writes self-contained prompts to `generated-prompts/<project>-security.md`. Then open each target project in its own clean chat and pass it the generated prompt.
 
 ---
 
-## 4. Защита от случайного коммита `GEMINI.md` и `STATE.md`
+## 4. Preventing Accidental Commits of `GEMINI.md` & `STATE.md`
 
-Чтобы локальные файлы оркестрации не улетали на GitHub вместе с кодом проекта:
-- Используй глобальный `~/.gitignore_global` (настраивается скриптами `install.ps1` / `install.sh`), **или**
-- Добавь `GEMINI.md` и `STATE.md` в `.git/info/exclude` конкретного репозитория (локально, не затрагивая общий `.gitignore`).
+To keep local orchestration files out of GitHub repositories:
+- Use a global `~/.gitignore_global` (configured automatically by `install.ps1` / `install.sh`), **or**
+- Add `GEMINI.md` and `STATE.md` to a repository's local `.git/info/exclude` without modifying the shared `.gitignore`.
