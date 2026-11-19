@@ -1,0 +1,6 @@
+{
+  "name": "security-baseline",
+  "displayName": "Global Security Baseline",
+  "version": "1.0.0",
+  "description": "Глобальные правила безопасности для всех проектов и чатов."
+}
